@@ -1,0 +1,108 @@
+Shift to psql console
+-------------------------------------------------------------------
+docker exec -it postgres psql -U postgres
+
+Get PG IP for PG Admin Server connection
+----------------------------------------------------------------------
+docker inspect postgres | grep IPAddress
+
+1> Create DB , User Roles and switch to DB with user role 
+(Obsolete as DB creation is handled from docker compose with db init file)
+-------------------------------------------------------------------------------------
+CREATE ROLE admin WITH LOGIN PASSWORD 'your_admin_password';
+CREATE DATABASE alljobs WITH OWNER admin;
+\c alljobs admin
+**************************************************************************************
+
+
+2> Create Extension
+-------------------------------------------------------------------------------------
+create extension if not exists "uuid-ossp";
+**************************************************************************************
+
+
+3> Create ci TABLES and Insert data
+-------------------------------------------------------------------------------------
+CREATE TABLE upstream_job_details (
+   upstream_job_id UUID DEFAULT uuid_generate_v4(),
+   upstream_job_name TEXT PRIMARY KEY,
+   upstream_is_pipeline BOOLEAN,
+   upstream_is_intermediate BOOLEAN NOT NULL,
+   upstream_ref_to_intermediate TEXT,
+   job_health TEXT,
+   job_health_description TEXT,
+   ci_workspace_id TEXT,
+   buildable BOOLEAN,
+   last_build_result TEXT,
+   last_build_timestamp BIGINT,
+   last_build_url TEXT,
+   last_build_tenant TEXT,
+   client_name TEXT,
+   ci_name TEXT,
+   embeddable_url TEXT,
+   created_timestamp TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
+
+CREATE TABLE downstream_job_details (
+   downstream_job_id UUID DEFAULT uuid_generate_v4(),
+   downstream_job_name TEXT PRIMARY KEY,
+   downstream_is_pipeline BOOLEAN NOT NULL,
+   upstream_job_name TEXT,
+   is_also_deployment BOOLEAN,
+   job_health TEXT,
+   job_health_description TEXT,
+   ci_workspace_id TEXT,
+   buildable BOOLEAN,
+   client_name TEXT,
+   job_owner VARCHAR,
+   branch_name TEXT,
+   last_build_result TEXT,
+   last_build_timestamp BIGINT,
+   last_build_url TEXT,
+   last_build_tenant TEXT,
+   user_comments TEXT,
+   job_type VARCHAR,
+   ci_name TEXT,
+   embeddable_url TEXT,
+   created_timestamp TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
+
+CREATE TABLE build_history_upstream (
+   build_history_id UUID UNIQUE DEFAULT uuid_generate_v4(),
+   build_number INTEGER,
+   upstream_job_id TEXT REFERENCES upstream_job_details(upstream_job_name) ON DELETE RESTRICT,
+   build_result VARCHAR(15),
+   build_duration BIGINT,
+   build_url TEXT,
+	client_name TEXT,
+   build_timestamp BIGINT,
+   tenant_name TEXT,
+   build_stages JSONB,
+   upstream_build_number INTEGER,
+	workspace_name TEXT,
+   ci_type TEXT,
+   created_timestamp TIMESTAMP NOT NULL DEFAULT current_timestamp,
+   PRIMARY KEY(build_url,tenant_name)
+   );
+
+CREATE TABLE build_history_downstream (
+   build_history_id UUID UNIQUE DEFAULT uuid_generate_v4(),
+   build_number INTEGER,
+   downstream_job_id TEXT REFERENCES downstream_job_details(downstream_job_name) ON DELETE RESTRICT,
+   build_result VARCHAR(15),
+   build_duration BIGINT,
+   build_url TEXT,
+   build_timestamp BIGINT,
+   upstream_build_number INTEGER,
+   branch_name TEXT,
+   tenant_name TEXT,
+   apm_build_number TEXT,
+   apm_version TEXT,
+   browser_name TEXT,
+   client_name TEXT,
+		workspace_name TEXT,
+   ci_type TEXT,
+   build_stages JSONB,
+   created_timestamp TIMESTAMP NOT NULL DEFAULT current_timestamp,
+   PRIMARY KEY(build_url,tenant_name)
+   );
