@@ -1,6 +1,6 @@
 module.exports = {
   type: "object",
-  required: ["api_url", "tenant_name", "browser_name", "type", "team"],
+  required: ["api_url", "tenant_name", "type", "team", "metrics"],
   properties: {
     api_url: {
       type: "string",
@@ -17,10 +17,13 @@ module.exports = {
       type: ["string", "null"],
     },
     app_version: {
-      type: ["string"],
+      type: ["string", "null"],
     },
     browser_name: {
       type: ["string", "null"],
+    },
+    metrics: {
+      type: "boolean",
     },
   },
 };

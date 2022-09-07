@@ -1,64 +1,53 @@
 const express = require("express");
 const router = express.Router();
-const { v4: uuidv4 } = require("uuid");
 
 const { Validator } = require("express-json-validator-middleware");
-
-const { genericUtils, jobWorkers } = require("../../utils");
-const { PG_QUERY_EXECUTORS } = require("../../models/pg/pgDbService");
 const { jobCompletedSchema } = require("../../schemas");
 
 const { validate } = new Validator({ useDefaults: true });
+const { produceEvents } = require("../../kafka/producer");
+const { kfSchema } = require("../../kafka/schemas");
+const { genericUtils } = require("../../utils");
 
 router.post(
   "/complete",
   validate({ body: jobCompletedSchema }),
   async (req, res, next) => {
     try {
-      const { api_url, tenant_name, app_version, browser_name, type, team } =
-        req.body;
-      await jobWorkers.addTeamCiTenant({ api_url, team, tenant_name });
-
-      const job_id = await jobWorkers.addJobIfMissingElseUpdate({
-        api_url,
-        tenant_name,
-        team,
-        type,
-      });
-
-      await jobWorkers.updateBuildHistoryFromComplete({
-        api_url,
-        tenant_name,
-        app_version,
-        browser_name,
-        team,
-        job_id,
-        type,
-      });
-
-      res.status(200).json({
+      const {
         api_url,
         tenant_name,
         app_version,
         browser_name,
         type,
         team,
-      });
+        metrics,
+      } = req.body;
+      if (metrics) {
+        const topic_updateWorkspace = "varis.papyrus.insert.workspace";
+        await res.sendStatus(201);
+        produceEvents(
+          topic_updateWorkspace,
+          {
+            api_url,
+            tenant_name,
+            app_version: app_version || null,
+            browser_name: browser_name || null,
+            type: type || null,
+            team,
+            retry: 0,
+            kfKey: genericUtils.crypt("timestamp", Date.now().toString()),
+          },
+          kfSchema.kfJobCompletedSchema
+        );
+      } else {
+        await res.sendStatus(200);
+      }
     } catch (err) {
       next(genericUtils.handleException(req, err, 500));
     }
   }
 );
-
-router.get("/getBuildAverges", async (req, res, next) => {
-  try {
-    const result = await jobWorkers.getBuildAverges(["dev", "qa"]);
-
-    res.status(200).json(result);
-  } catch (err) {
-    next(genericUtils.handleException(req, err, 500));
-  }
-});
 
 router.get("/getpid", async (req, res, next) => {
   try {

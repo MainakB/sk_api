@@ -6,7 +6,7 @@ const {
   logDate,
   writeToLogs,
   startLogTime,
-} = require("../utils/genericUtils");
+} = require("./genericUtils");
 
 const createLogFormat = (str, logLevel, functionName, duration) => {
   const methodName = `${chalk.magenta(logLevel)}`;
